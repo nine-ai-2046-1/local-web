@@ -1,0 +1,18 @@
+[package]
+name = "local-web"
+version = "0.1.0"
+edition = "2021"
+description = "A simple, secure local static file server"
+authors = ["local-web"]
+
+[dependencies]
+hyper = { version = "1.10.1", features = ["full"] }
+hyper-util = { version = "0.1", features = ["full"] }
+http-body-util = "0.1"
+tokio = { version = "1.52.3", features = ["full"] }
+clap = { version = "4.6.1", features = ["derive"] }
+rcgen = "0.13"
+rustls = "0.23"
+rustls-pemfile = "2"
+bytes = "1"
+chrono = "0.4"
