@@ -4,6 +4,10 @@ on:
   push:
     tags:
       - 'v*'
+  pull_request:
+    branches:
+      - main
+    types: [opened, synchronize, reopened]
   workflow_dispatch:
     inputs:
       version:
@@ -14,8 +18,13 @@ on:
 permissions:
   contents: write
 
+concurrency:
+  group: release-${{ github.event_name }}-${{ github.ref }}
+  cancel-in-progress: true
+
 env:
   CARGO_TERM_COLOR: always
+  RETENTION_DAYS: 14
 
 jobs:
   linux:
@@ -70,6 +79,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: local-web-${{ matrix.target }}
+          retention-days: ${{ env.RETENTION_DAYS }}
           path: |
             local-web-*.tar.gz
             local-web-*.tar.gz.sha256
@@ -120,6 +130,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: local-web-x86_64-pc-windows-msvc
+          retention-days: ${{ env.RETENTION_DAYS }}
           path: |
             local-web-*.zip
             local-web-*.zip.sha256
@@ -174,6 +185,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: local-web-${{ matrix.target }}
+          retention-days: ${{ env.RETENTION_DAYS }}
           path: |
             local-web-*.tar.gz
             local-web-*.tar.gz.sha256
