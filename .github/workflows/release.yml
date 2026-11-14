@@ -4,6 +4,8 @@ on:
   push:
     tags:
       - 'v*'
+    branches:
+      - main
   pull_request:
     branches:
       - main
@@ -19,16 +21,72 @@ permissions:
   contents: write
 
 concurrency:
-  group: release-${{ github.event_name }}-${{ github.ref }}
+  group: release-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 env:
   CARGO_TERM_COLOR: always
-  RETENTION_DAYS: 14
 
 jobs:
+  prep:
+    name: Resolve version
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.ver.outputs.version }}
+      build: ${{ steps.decide.outputs.build }}
+      publish: ${{ steps.decide.outputs.publish }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Resolve version
+        id: ver
+        env:
+          INPUT_VERSION: ${{ github.event.inputs.version }}
+        run: |
+          if [ -n "$INPUT_VERSION" ]; then
+            V="$INPUT_VERSION"
+          elif [ "${{ github.ref_type }}" = "tag" ]; then
+            V="${GITHUB_REF_NAME#v}"
+          else
+            V=$(grep -m1 '^version' Cargo.toml | sed 's/.*"\(.*\)".*/\1/')
+          fi
+          echo "Resolved version: $V"
+          echo "version=$V" >> "$GITHUB_OUTPUT"
+
+      - name: Decide build and publish
+        id: decide
+        env:
+          VERSION: ${{ steps.ver.outputs.version }}
+        run: |
+          if git rev-parse -q --verify "refs/tags/v${VERSION}" >/dev/null 2>&1; then
+            TAG_EXISTS=true
+          else
+            TAG_EXISTS=false
+          fi
+          echo "tag v${VERSION} exists: ${TAG_EXISTS}"
+
+          BUILD=true
+          PUBLISH=true
+
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            PUBLISH=false
+          elif [ "${{ github.event_name }}" = "push" ]; then
+            if [ "${{ github.ref_type }}" != "tag" ] && [ "${TAG_EXISTS}" = "true" ]; then
+              echo "Tag already exists for v${VERSION} - nothing to build or publish."
+              BUILD=false
+              PUBLISH=false
+            fi
+          fi
+
+          echo "build=${BUILD}" >> "$GITHUB_OUTPUT"
+          echo "publish=${PUBLISH}" >> "$GITHUB_OUTPUT"
+
   macos:
     name: macOS ${{ matrix.target }}
+    needs: [prep]
+    if: needs.prep.outputs.build == 'true'
     runs-on: macos-latest
     strategy:
       fail-fast: false
@@ -38,20 +96,6 @@ jobs:
           - x86_64-apple-darwin
     steps:
       - uses: actions/checkout@v4
-
-      - name: Resolve version
-        id: ver
-        env:
-          INPUT_VERSION: ${{ github.event.inputs.version }}
-        run: |
-          if [ -n "$INPUT_VERSION" ]; then
-            V="$INPUT_VERSION"
-          elif [[ "${GITHUB_REF_NAME}" == v* ]]; then
-            V="${GITHUB_REF_NAME#v}"
-          else
-            V=$(grep -m1 '^version' Cargo.toml | sed 's/.*"\(.*\)".*/\1/')
-          fi
-          echo "version=$V" >> "$GITHUB_OUTPUT"
 
       - name: Add target
         run: rustup target add ${{ matrix.target }}
@@ -65,45 +109,30 @@ jobs:
         run: cargo build --release --locked --target ${{ matrix.target }}
 
       - name: Package
+        env:
+          VER: ${{ needs.prep.outputs.version }}
         run: |
-          VER="${{ steps.ver.outputs.version }}"
           OUT="local-web-${VER}-${{ matrix.target }}"
           mkdir -p "$OUT"
           cp "target/${{ matrix.target }}/release/local-web" "$OUT/"
           cp README.md LICENSE "$OUT/"
           tar -czf "${OUT}.tar.gz" -C . "$OUT"
-          sha256sum "${OUT}.tar.gz" > "${OUT}.tar.gz.sha256"
+          shasum -a 256 "${OUT}.tar.gz" > "${OUT}.tar.gz.sha256"
 
       - uses: actions/upload-artifact@v4
         with:
           name: local-web-${{ matrix.target }}
-          retention-days: ${{ env.RETENTION_DAYS }}
+          retention-days: 14
           path: |
             local-web-*.tar.gz
             local-web-*.tar.gz.sha256
 
   release:
     name: Publish release
-    needs: [macos]
-    if: github.event_name == 'push' || inputs.version != ''
+    needs: [prep, macos]
+    if: needs.prep.outputs.publish == 'true'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-
-      - name: Resolve version
-        id: ver
-        env:
-          INPUT_VERSION: ${{ github.event.inputs.version }}
-        run: |
-          if [ -n "$INPUT_VERSION" ]; then
-            V="$INPUT_VERSION"
-          elif [[ "${GITHUB_REF_NAME}" == v* ]]; then
-            V="${GITHUB_REF_NAME#v}"
-          else
-            V=$(grep -m1 '^version' Cargo.toml | sed 's/.*"\(.*\)".*/\1/')
-          fi
-          echo "version=$V" >> "$GITHUB_OUTPUT"
-
       - uses: actions/download-artifact@v4
         with:
           path: artifacts
@@ -114,8 +143,8 @@ jobs:
 
       - uses: softprops/action-gh-release@v2
         with:
-          tag_name: v${{ steps.ver.outputs.version }}
-          name: v${{ steps.ver.outputs.version }}
+          tag_name: v${{ needs.prep.outputs.version }}
+          name: v${{ needs.prep.outputs.version }}
           files: artifacts/*
           generate_release_notes: true
           draft: false
