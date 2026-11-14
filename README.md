@@ -14,12 +14,50 @@ A simple, secure local static file server written in Rust.
 
 ## Installation
 
-```bash
-# Build from source
-cargo build --release
+Download a prebuilt binary from the
+[Releases page](https://github.com/nine-ai-2046-1/local-web/releases) — no Rust toolchain needed.
 
+| Platform | File |
+|---|---|
+| Linux x86_64 (static, any distro) | `local-web-<version>-x86_64-unknown-linux-musl.tar.gz` |
+| Linux ARM64 (static) | `local-web-<version>-aarch64-unknown-linux-musl.tar.gz` |
+| Windows x64 | `local-web-<version>-x86_64-pc-windows-msvc.zip` |
+| macOS Apple Silicon | `local-web-<version>-aarch64-apple-darwin.tar.gz` |
+| macOS Intel | `local-web-<version>-x86_64-apple-darwin.tar.gz` |
+
+Each archive ships with a matching `.sha256` file. Verify it first:
+
+```bash
+sha256sum -c local-web-<version>-<target>.tar.gz.sha256
+```
+
+Then unpack and run:
+
+```bash
+# Linux / macOS
+tar -xzf local-web-<version>-<target>.tar.gz
+cd local-web-<version>-<target>
+./local-web -p 8080 -d ./site
+```
+
+```powershell
+# Windows
+Expand-Archive local-web-<version>-x86_64-pc-windows-msvc.zip -DestinationPath .
+.\local-web-<version>-x86_64-pc-windows-msvc\local-web.exe -p 8080 -d .\site
+```
+
+On macOS the binary is unsigned; if Gatekeeper blocks it, run
+`xattr -d com.apple.quarantine ./local-web` or allow it in System Settings.
+
+<details>
+<summary>Build from source</summary>
+
+```bash
+cargo build --release
 # The binary will be in target/release/local-web
 ```
+
+</details>
 
 ## Usage
 
