@@ -14,50 +14,47 @@ A simple, secure local static file server written in Rust. No NodeJS No Python.
 
 ## Installation
 
-Download a prebuilt binary from the
-[Releases page](https://github.com/nine-ai-2046-1/local-web/releases) — no Rust toolchain needed.
+Prebuilt binaries are published for **macOS only**. On Linux and Windows, build from source.
 
-| Platform | File |
+### macOS (prebuilt, no toolchain needed)
+
+Download from the [Releases page](https://github.com/nine-ai-2046-1/local-web/releases):
+
+| Mac type | File |
 |---|---|
-| Linux x86_64 (static, any distro) | `local-web-<version>-x86_64-unknown-linux-musl.tar.gz` |
-| Linux ARM64 (static) | `local-web-<version>-aarch64-unknown-linux-musl.tar.gz` |
-| Windows x64 | `local-web-<version>-x86_64-pc-windows-msvc.zip` |
-| macOS Apple Silicon | `local-web-<version>-aarch64-apple-darwin.tar.gz` |
-| macOS Intel | `local-web-<version>-x86_64-apple-darwin.tar.gz` |
+| Apple Silicon (M1/M2/M3/M4) | `local-web-<version>-aarch64-apple-darwin.tar.gz` |
+| Intel | `local-web-<version>-x86_64-apple-darwin.tar.gz` |
 
 Each archive ships with a matching `.sha256` file. Verify it first:
 
 ```bash
-sha256sum -c local-web-<version>-<target>.tar.gz.sha256
+shasum -a 256 -c local-web-<version>-<target>.tar.gz.sha256
 ```
 
 Then unpack and run:
 
 ```bash
-# Linux / macOS
 tar -xzf local-web-<version>-<target>.tar.gz
 cd local-web-<version>-<target>
 ./local-web -p 8080 -d ./site
 ```
 
-```powershell
-# Windows
-Expand-Archive local-web-<version>-x86_64-pc-windows-msvc.zip -DestinationPath .
-.\local-web-<version>-x86_64-pc-windows-msvc\local-web.exe -p 8080 -d .\site
-```
-
-On macOS the binary is unsigned; if Gatekeeper blocks it, run
-`xattr -d com.apple.quarantine ./local-web` or allow it in System Settings.
-
-<details>
-<summary>Build from source</summary>
+The binary is unsigned and unnotarized. If Gatekeeper blocks it, allow it in
+**System Settings → Privacy & Security**, or clear the quarantine flag:
 
 ```bash
-cargo build --release
-# The binary will be in target/release/local-web
+xattr -d com.apple.quarantine ./local-web
 ```
 
-</details>
+### Linux / Windows (build from source)
+
+Requires a Rust toolchain — see [rustup.rs](https://rustup.rs).
+
+```bash
+cargo build --release --locked
+```
+
+The binary will be at `target/release/local-web` (`target/release/local-web.exe` on Windows).
 
 ## Usage
 
