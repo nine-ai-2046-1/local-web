@@ -1,6 +1,6 @@
 # local-web
 
-A simple, secure local static file server written in Rust.
+A simple, secure local static file server written in Rust. No NodeJS No Python.
 
 ## Features
 
