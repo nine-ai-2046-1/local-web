@@ -27,114 +27,6 @@ env:
   RETENTION_DAYS: 14
 
 jobs:
-  linux:
-    name: Linux ${{ matrix.target }}
-    runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        target:
-          - x86_64-unknown-linux-musl
-          - aarch64-unknown-linux-musl
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Resolve version
-        id: ver
-        env:
-          INPUT_VERSION: ${{ github.event.inputs.version }}
-        run: |
-          if [ -n "$INPUT_VERSION" ]; then
-            V="$INPUT_VERSION"
-          elif [[ "${GITHUB_REF_NAME}" == v* ]]; then
-            V="${GITHUB_REF_NAME#v}"
-          else
-            V=$(grep -m1 '^version' Cargo.toml | sed 's/.*"\(.*\)".*/\1/')
-          fi
-          echo "version=$V" >> "$GITHUB_OUTPUT"
-
-      - name: Install cross
-        uses: taiki-e/install-action@v2
-        with:
-          tool: cross
-
-      - name: Cache cargo
-        uses: Swatinem/rust-cache@v2
-        with:
-          key: ${{ matrix.target }}
-
-      - name: Build
-        run: cross build --release --locked --target ${{ matrix.target }}
-
-      - name: Package
-        run: |
-          VER="${{ steps.ver.outputs.version }}"
-          OUT="local-web-${VER}-${{ matrix.target }}"
-          mkdir -p "$OUT"
-          cp "target/${{ matrix.target }}/release/local-web" "$OUT/"
-          cp README.md LICENSE "$OUT/"
-          tar -czf "${OUT}.tar.gz" -C . "$OUT"
-          sha256sum "${OUT}.tar.gz" > "${OUT}.tar.gz.sha256"
-
-      - uses: actions/upload-artifact@v4
-        with:
-          name: local-web-${{ matrix.target }}
-          retention-days: ${{ env.RETENTION_DAYS }}
-          path: |
-            local-web-*.tar.gz
-            local-web-*.tar.gz.sha256
-
-  windows:
-    name: Windows x86_64
-    runs-on: windows-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Resolve version
-        id: ver
-        shell: bash
-        env:
-          INPUT_VERSION: ${{ github.event.inputs.version }}
-        run: |
-          if [ -n "$INPUT_VERSION" ]; then
-            V="$INPUT_VERSION"
-          elif [[ "${GITHUB_REF_NAME}" == v* ]]; then
-            V="${GITHUB_REF_NAME#v}"
-          else
-            V=$(grep -m1 '^version' Cargo.toml | sed 's/.*"\(.*\)".*/\1/')
-          fi
-          echo "version=$V" >> "$GITHUB_OUTPUT"
-
-      - name: Install NASM
-        run: |
-          choco install nasm -y --no-progress
-          echo "C:\Program Files\NASM" >> $env:GITHUB_PATH
-
-      - name: Cache cargo
-        uses: Swatinem/rust-cache@v2
-
-      - name: Build
-        run: cargo build --release --locked
-
-      - name: Package
-        shell: bash
-        run: |
-          VER="${{ steps.ver.outputs.version }}"
-          OUT="local-web-${VER}-x86_64-pc-windows-msvc"
-          mkdir -p "$OUT"
-          cp target/release/local-web.exe "$OUT/"
-          cp README.md LICENSE "$OUT/"
-          powershell -Command "Compress-Archive -Path '$OUT/*' -DestinationPath '${OUT}.zip' -Force"
-          sha256sum "${OUT}.zip" > "${OUT}.zip.sha256"
-
-      - uses: actions/upload-artifact@v4
-        with:
-          name: local-web-x86_64-pc-windows-msvc
-          retention-days: ${{ env.RETENTION_DAYS }}
-          path: |
-            local-web-*.zip
-            local-web-*.zip.sha256
-
   macos:
     name: macOS ${{ matrix.target }}
     runs-on: macos-latest
@@ -192,7 +84,7 @@ jobs:
 
   release:
     name: Publish release
-    needs: [linux, windows, macos]
+    needs: [macos]
     if: github.event_name == 'push' || inputs.version != ''
     runs-on: ubuntu-latest
     steps:
